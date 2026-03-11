@@ -8,6 +8,7 @@ WCX is a reusable Arduino library implemented in portable C for small embedded s
 
 The first version of the library provides these modules:
 
+- `wcx_timer`: lightweight non-blocking timers for polling-style state machines and loop logic.
 - `wcx_ring_buffer`: fixed-capacity byte FIFO for serial queues, sensor packets, and producer-consumer pipelines.
 - `wcx_debounce`: software debouncing for buttons, switches, and digital sensor edges.
 - `wcx_scheduler`: cooperative periodic and one-shot task execution on top of `millis()`.
@@ -15,6 +16,10 @@ The first version of the library provides these modules:
 - `wcx_pid`: a practical PID controller with bounded output and derivative-on-measurement.
 - `wcx_crc`: CRC-8, CRC-16/CCITT, and XOR checksum helpers.
 - `wcx_stats`: running min, max, average, and variance without storing every sample.
+- `wcx_fsm`: table-driven finite state machines with optional enter, exit, and transition callbacks.
+- `wcx_protocol`: framed byte-stream encoding and decoding with delimiter escaping.
+- `wcx_calibration`: linear and affine calibration helpers for raw sensor values.
+- `wcx_fixed_point`: Q16.16 fixed-point conversions and arithmetic helpers.
 - `wcx_common`: small timing and scaling helpers shared by the other modules.
 
 ## Design goals
@@ -98,6 +103,10 @@ The debounce module tracks a candidate state and only commits a new stable state
 
 The scheduler is cooperative, not preemptive. Each task callback should return quickly and avoid blocking. This is a good fit for LED blinking, periodic sensor reads, time-based state transitions, and heartbeat messages.
 
+### Timers and FSMs
+
+The timer and FSM modules are meant to work together. Timers handle elapsed-time checks without blocking the main loop, while the FSM module keeps state transitions explicit and testable.
+
 ### Filters and PID
 
 The filtering and control modules are intentionally independent. A common pattern is:
@@ -111,6 +120,10 @@ The filtering and control modules are intentionally independent. A common patter
 
 These helpers are useful for validating messages sent over serial links, radios, and custom protocols.
 
+### Framing, calibration, and fixed-point math
+
+`wcx_protocol` implements a compact framed transport format for byte streams that need delimiter-safe encoding. `wcx_calibration` helps turn raw ADC or engineering-unit readings into usable values, and `wcx_fixed_point` is useful when you want deterministic fractional math without paying for floating-point everywhere.
+
 ## Examples
 
 - `BasicDiagnostics`: shows debouncing, ring-buffered serial messages, running statistics, and CRC computation.
@@ -119,14 +132,14 @@ These helpers are useful for validating messages sent over serial links, radios,
 
 ## Extending the library
 
-Reasonable next modules for this library would be:
+The first round of planned follow-on modules is now implemented. Reasonable next additions beyond this baseline would be:
 
-- finite state machines,
-- protocol framing,
-- sensor calibration helpers,
-- fixed-point math utilities,
-- non-blocking software timers.
+- hysteresis and threshold detectors,
+- lookup-table interpolation helpers,
+- reusable event queues and pub/sub dispatch,
+- small serialization helpers for structs and messages,
+- integer-only filter variants for very small MCUs.
 
 ## Status
 
-This repository now contains a functional baseline Arduino C utility library. It should still be validated against your target board set in the Arduino IDE or PlatformIO, especially if you want stricter AVR-specific footprint constraints.
+This repository now contains a broader baseline Arduino C utility library covering scheduling, control, framing, calibration, fixed-point math, and explicit state-machine building blocks. It should still be validated against your target board set in the Arduino IDE or PlatformIO, especially if you want stricter AVR-specific footprint constraints.

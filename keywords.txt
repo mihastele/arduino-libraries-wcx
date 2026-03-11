@@ -1,4 +1,5 @@
 WCX	KEYWORD1
+wcx_timer_t	KEYWORD2
 wcx_ring_buffer_t	KEYWORD2
 wcx_debounce_t	KEYWORD2
 wcx_task_t	KEYWORD2
@@ -7,8 +8,18 @@ wcx_moving_average_t	KEYWORD2
 wcx_ema_filter_t	KEYWORD2
 wcx_pid_t	KEYWORD2
 wcx_stats_t	KEYWORD2
+wcx_fsm_t	KEYWORD2
+wcx_frame_decoder_t	KEYWORD2
+wcx_linear_calibration_t	KEYWORD2
+wcx_affine_calibration_t	KEYWORD2
+wcx_q16_16_t	KEYWORD2
+wcx_timer_expired	KEYWORD3
 wcx_ring_buffer_init	KEYWORD3
 wcx_debounce_update	KEYWORD3
 wcx_scheduler_tick	KEYWORD3
 wcx_pid_compute	KEYWORD3
 wcx_crc16_ccitt	KEYWORD3
+wcx_fsm_dispatch	KEYWORD3
+wcx_frame_encode	KEYWORD3
+wcx_linear_calibration_apply	KEYWORD3
+wcx_q16_16_mul	KEYWORD3

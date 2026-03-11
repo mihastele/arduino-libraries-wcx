@@ -107,6 +107,54 @@ static void increment_counter(void *context)
     }
 }
 
+typedef struct
+{
+    int enters;
+    int exits;
+    int actions;
+} fsm_counter_t;
+
+static void fsm_on_enter(void *context, wcx_fsm_state_id_t state)
+{
+    fsm_counter_t *counter = (fsm_counter_t *)context;
+
+    (void)state;
+
+    if (counter != NULL)
+    {
+        counter->enters++;
+    }
+}
+
+static void fsm_on_exit(void *context, wcx_fsm_state_id_t state)
+{
+    fsm_counter_t *counter = (fsm_counter_t *)context;
+
+    (void)state;
+
+    if (counter != NULL)
+    {
+        counter->exits++;
+    }
+}
+
+static void fsm_on_transition(void *context,
+                              wcx_fsm_state_id_t from_state,
+                              wcx_fsm_event_id_t event,
+                              wcx_fsm_state_id_t to_state)
+{
+    fsm_counter_t *counter = (fsm_counter_t *)context;
+
+    (void)from_state;
+    (void)event;
+    (void)to_state;
+
+    if (counter != NULL)
+    {
+        counter->actions++;
+    }
+}
+
 static void test_common(void)
 {
     assert_true(wcx_time_reached(100U, 100U), "time reached accepts equal timestamps");
@@ -285,6 +333,155 @@ static void test_stats(void)
                        "stats variance uses population formula");
 }
 
+static void test_timer(void)
+{
+    wcx_timer_t timer;
+
+    wcx_timer_init(&timer, 10U, false);
+    assert_true(!wcx_timer_running(&timer), "timer starts stopped");
+
+    wcx_timer_start(&timer, 100U);
+    assert_true(wcx_timer_running(&timer), "timer start enables timer");
+    assert_u32(wcx_timer_remaining(&timer, 105U), 5U, "timer reports remaining time");
+    assert_true(!wcx_timer_expired(&timer, 109U), "timer does not expire early");
+    assert_true(wcx_timer_expired(&timer, 110U), "timer expires at deadline");
+    assert_true(!wcx_timer_running(&timer), "one-shot timer stops after expiry");
+
+    wcx_timer_init(&timer, 4U, true);
+    wcx_timer_start(&timer, 20U);
+    assert_true(wcx_timer_expired(&timer, 24U), "periodic timer expires at first interval");
+    assert_true(wcx_timer_running(&timer), "periodic timer remains running");
+    assert_u32(wcx_timer_remaining(&timer, 25U), 3U, "periodic timer advances deadline");
+    wcx_timer_stop(&timer);
+    assert_true(!wcx_timer_running(&timer), "timer stop disables timer");
+}
+
+static void test_fsm(void)
+{
+    fsm_counter_t counters = {0};
+    wcx_fsm_t fsm;
+    static const wcx_fsm_state_t states[] = {
+        {1U, fsm_on_enter, fsm_on_exit},
+        {2U, fsm_on_enter, fsm_on_exit},
+    };
+    static const wcx_fsm_transition_t transitions[] = {
+        {1U, 10U, 2U, fsm_on_transition},
+        {2U, 11U, 2U, fsm_on_transition},
+        {2U, 12U, 1U, fsm_on_transition},
+    };
+
+    wcx_fsm_init(&fsm,
+                 1U,
+                 states,
+                 WCX_ARRAY_SIZE(states),
+                 transitions,
+                 WCX_ARRAY_SIZE(transitions),
+                 &counters);
+
+    assert_u32((uint32_t)wcx_fsm_state(&fsm), 1U, "FSM initializes with selected state");
+    assert_true(wcx_fsm_dispatch(&fsm, 10U), "FSM handles matching transition");
+    assert_u32((uint32_t)wcx_fsm_state(&fsm), 2U, "FSM updates current state");
+    assert_u32((uint32_t)counters.exits, 1U, "FSM invokes exit callback on state change");
+    assert_u32((uint32_t)counters.enters, 1U, "FSM invokes enter callback on state change");
+    assert_u32((uint32_t)counters.actions, 1U, "FSM invokes transition action");
+
+    assert_true(wcx_fsm_dispatch(&fsm, 11U), "FSM handles self transition");
+    assert_u32((uint32_t)counters.exits, 1U, "FSM skips exit callback on self transition");
+    assert_u32((uint32_t)counters.enters, 1U, "FSM skips enter callback on self transition");
+    assert_u32((uint32_t)counters.actions, 2U, "FSM still invokes action on self transition");
+
+    assert_true(!wcx_fsm_dispatch(&fsm, 99U), "FSM rejects unknown event");
+}
+
+static void test_protocol(void)
+{
+    static const uint8_t payload[] = {0x01U, 0x7EU, 0x7DU, 0x20U};
+    uint8_t encoded[16] = {0U};
+    uint8_t decoded[8] = {0U};
+    wcx_frame_decoder_t decoder;
+    wcx_frame_decoder_result_t result = WCX_FRAME_DECODER_IDLE;
+    size_t index;
+
+    assert_size(wcx_frame_encoded_capacity(sizeof(payload)), 10U,
+                "frame capacity accounts for worst-case escaping");
+
+    assert_true(wcx_frame_decoder_init(&decoder, decoded, sizeof(decoded), 0x7EU, 0x7DU),
+                "frame decoder init succeeds");
+    assert_size(wcx_frame_encode(payload,
+                                 sizeof(payload),
+                                 0x7EU,
+                                 0x7DU,
+                                 encoded,
+                                 sizeof(encoded)),
+                8U,
+                "frame encode escapes delimiter and escape bytes");
+
+    for (index = 0U; index < 8U; ++index)
+    {
+        result = wcx_frame_decoder_push(&decoder, encoded[index]);
+    }
+
+    assert_u32((uint32_t)result, (uint32_t)WCX_FRAME_DECODER_COMPLETE,
+               "frame decoder reports complete frame");
+    assert_size(wcx_frame_decoder_length(&decoder), sizeof(payload),
+                "frame decoder restores payload length");
+    assert_u8(wcx_frame_decoder_data(&decoder)[1], 0x7EU,
+              "frame decoder unescapes delimiter");
+    assert_u8(wcx_frame_decoder_data(&decoder)[2], 0x7DU,
+              "frame decoder unescapes escape byte");
+
+    wcx_frame_decoder_init(&decoder, decoded, 2U, 0x7EU, 0x7DU);
+    for (index = 0U; index < 8U; ++index)
+    {
+        result = wcx_frame_decoder_push(&decoder, encoded[index]);
+    }
+    assert_u32((uint32_t)result, (uint32_t)WCX_FRAME_DECODER_OVERFLOW,
+               "frame decoder reports overflow when payload exceeds buffer");
+}
+
+static void test_calibration(void)
+{
+    wcx_linear_calibration_t linear;
+    wcx_affine_calibration_t affine;
+
+    wcx_linear_calibration_init(&linear, 0.0f, 1023.0f, 0.0f, 5.0f, true);
+    assert_float_close(wcx_linear_calibration_apply(&linear, 511.5f), 2.5f, 0.001f,
+                       "linear calibration maps midpoint");
+    assert_float_close(wcx_linear_calibration_apply(&linear, 1200.0f), 5.0f, 0.0001f,
+                       "linear calibration clamps output when configured");
+    assert_float_close(wcx_linear_calibration_inverse(&linear, 2.5f), 511.5f, 0.01f,
+                       "linear calibration inverts scaled value");
+
+    wcx_affine_calibration_init(&affine, 2.0f, -1.0f);
+    assert_float_close(wcx_affine_calibration_apply(&affine, 3.0f), 5.0f, 0.0001f,
+                       "affine calibration applies scale and offset");
+    assert_float_close(wcx_affine_calibration_inverse(&affine, 5.0f), 3.0f, 0.0001f,
+                       "affine calibration inverse restores value");
+}
+
+static void test_fixed_point(void)
+{
+    wcx_q16_16_t one_and_half = wcx_q16_16_from_float(1.5f);
+    wcx_q16_16_t two = wcx_q16_16_from_int(2);
+    wcx_q16_16_t product = wcx_q16_16_mul(one_and_half, two);
+    wcx_q16_16_t quotient = wcx_q16_16_div(wcx_q16_16_from_int(3), two);
+
+    assert_float_close(wcx_q16_16_to_float(one_and_half), 1.5f, 0.0001f,
+                       "Q16.16 round-trips float conversion");
+    assert_u32((uint32_t)wcx_q16_16_to_int(wcx_q16_16_from_int(7)), 7U,
+               "Q16.16 converts integer values");
+    assert_float_close(wcx_q16_16_to_float(product), 3.0f, 0.0001f,
+                       "Q16.16 multiply preserves fractional values");
+    assert_float_close(wcx_q16_16_to_float(quotient), 1.5f, 0.0001f,
+                       "Q16.16 divide preserves fractional values");
+    assert_float_close(wcx_q16_16_to_float(wcx_q16_16_clamp(product,
+                                                             wcx_q16_16_from_int(0),
+                                                             wcx_q16_16_from_int(2))),
+                       2.0f,
+                       0.0001f,
+                       "Q16.16 clamp bounds values");
+}
+
 int main(void)
 {
     test_common();
@@ -295,6 +492,11 @@ int main(void)
     test_pid();
     test_crc();
     test_stats();
+    test_timer();
+    test_fsm();
+    test_protocol();
+    test_calibration();
+    test_fixed_point();
 
     if (g_failures != 0)
     {
