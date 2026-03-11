@@ -1,5 +1,7 @@
 # WCX
 
+[![Tests](https://github.com/mihastele/arduino-libraries-wcx/actions/workflows/test.yml/badge.svg)](https://github.com/mihastele/arduino-libraries-wcx/actions/workflows/test.yml)
+
 WCX is a reusable Arduino library implemented in portable C for small embedded systems. It is organized as a set of small, allocation-free modules that are easy to combine inside Arduino sketches, but the code is written to stay broadly useful outside the Arduino ecosystem as well.
 
 ## What is included
@@ -41,6 +43,18 @@ The first version of the library provides these modules:
 ### PlatformIO
 
 Add the repository as a local or git dependency, then include `wcx.h` from your sketch or source file.
+
+## Testing
+
+The core modules are covered by a native host-side test suite so they can be validated in CI without needing a physical Arduino board.
+
+Run the tests locally with:
+
+```sh
+make test
+```
+
+The GitHub Actions workflow in `.github/workflows/test.yml` runs the same command on every push to `main` and on pull requests. The badge at the top of this README reflects the latest workflow status.
 
 ## Quick start
 
