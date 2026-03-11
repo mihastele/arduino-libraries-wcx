@@ -51,10 +51,12 @@ The core modules are covered by a native host-side test suite so they can be val
 Run the tests locally with:
 
 ```sh
-make test
+bash tests/run-tests.sh
 ```
 
-The GitHub Actions workflow in `.github/workflows/test.yml` runs the same command on every push to `main` and on pull requests. The badge at the top of this README reflects the latest workflow status.
+If you have `make` installed, `make test` is also available as a convenience wrapper.
+
+The GitHub Actions workflow in `.github/workflows/test.yml` runs the same shell command on every push to `main` and on pull requests. The badge at the top of this README reflects the latest workflow status.
 
 ## Quick start
 
