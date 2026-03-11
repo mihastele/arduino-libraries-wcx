@@ -1,0 +1,14 @@
+WCX	KEYWORD1
+wcx_ring_buffer_t	KEYWORD2
+wcx_debounce_t	KEYWORD2
+wcx_task_t	KEYWORD2
+wcx_scheduler_t	KEYWORD2
+wcx_moving_average_t	KEYWORD2
+wcx_ema_filter_t	KEYWORD2
+wcx_pid_t	KEYWORD2
+wcx_stats_t	KEYWORD2
+wcx_ring_buffer_init	KEYWORD3
+wcx_debounce_update	KEYWORD3
+wcx_scheduler_tick	KEYWORD3
+wcx_pid_compute	KEYWORD3
+wcx_crc16_ccitt	KEYWORD3
