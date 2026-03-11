@@ -20,6 +20,14 @@ The first version of the library provides these modules:
 - `wcx_protocol`: framed byte-stream encoding and decoding with delimiter escaping.
 - `wcx_calibration`: linear and affine calibration helpers for raw sensor values.
 - `wcx_fixed_point`: Q16.16 fixed-point conversions and arithmetic helpers.
+- `wcx_hysteresis`: hysteresis comparator and multi-zone threshold detector.
+- `wcx_lut`: float and integer lookup-table interpolation with binary search.
+- `wcx_event`: allocation-free event queue with publish/subscribe dispatch.
+- `wcx_serialize`: byte-order-safe pack/unpack helpers and cursor-based packer/unpacker.
+- `wcx_ifilter`: integer-only moving average and exponential moving average filters.
+- `wcx_watchdog`: software watchdog / heartbeat monitor with expiry callback.
+- `wcx_pulse`: pulse counter and frequency meter for digital edges.
+- `wcx_rate_limiter`: float and integer slew-rate limiters for smooth setpoint changes.
 - `wcx_common`: small timing and scaling helpers shared by the other modules.
 
 ## Design goals
@@ -124,6 +132,38 @@ These helpers are useful for validating messages sent over serial links, radios,
 
 `wcx_protocol` implements a compact framed transport format for byte streams that need delimiter-safe encoding. `wcx_calibration` helps turn raw ADC or engineering-unit readings into usable values, and `wcx_fixed_point` is useful when you want deterministic fractional math without paying for floating-point everywhere.
 
+### Hysteresis and threshold detection
+
+`wcx_hysteresis` provides a simple comparator with separate high and low thresholds to prevent noisy signals from causing rapid toggling. The threshold detector extends this idea to four configurable zones (low, normal, high, critical) with a user-defined hysteresis band.
+
+### Lookup-table interpolation
+
+`wcx_lut` stores a sorted set of (x, y) points and performs linear interpolation between them using binary search. Values outside the table are clamped to the nearest endpoint. An integer-only variant (`wcx_ilut`) avoids floating-point entirely.
+
+### Event queue and publish/subscribe
+
+`wcx_event` is a lightweight event bus with caller-owned queue and subscription storage. Events carry a one-byte payload. Subscribers register interest in a specific event ID; `wcx_event_dispatch` drains the queue and invokes matching handlers.
+
+### Serialization
+
+`wcx_serialize` provides standalone pack/unpack functions for 8, 16, and 32-bit integers in both big-endian and little-endian formats. Cursor-based `wcx_packer_t` and `wcx_unpacker_t` wrappers track the current position and detect buffer overflows.
+
+### Integer-only filters
+
+`wcx_ifilter` provides `wcx_imoving_average_t` and `wcx_iema_t` — integer analogues of the floating-point filters in `wcx_filter`. The EMA uses a shift-based weighting so no division or floating-point is needed.
+
+### Software watchdog
+
+`wcx_watchdog` monitors whether a subsystem has checked in within its deadline. If the deadline expires, an optional callback fires. Call `wcx_watchdog_kick` periodically to reset the timer.
+
+### Pulse counter
+
+`wcx_pulse` counts rising edges and measures inter-edge period. It computes frequency in Hz from the most recent period. Useful for rotary encoders, flow meters, and RPM sensing.
+
+### Rate limiter
+
+`wcx_rate_limiter` constrains how fast a value can change per update step (slew-rate limiting). Separate rise and fall limits allow asymmetric ramping. An integer variant (`wcx_irate_limiter_t`) is included for MCUs without FPU.
+
 ## Examples
 
 - `BasicDiagnostics`: shows debouncing, ring-buffered serial messages, running statistics, and CRC computation.
@@ -132,13 +172,13 @@ These helpers are useful for validating messages sent over serial links, radios,
 
 ## Extending the library
 
-The first round of planned follow-on modules is now implemented. Reasonable next additions beyond this baseline would be:
+All previously planned follow-on modules are now implemented. Reasonable next additions beyond this baseline would be:
 
-- hysteresis and threshold detectors,
-- lookup-table interpolation helpers,
-- reusable event queues and pub/sub dispatch,
-- small serialization helpers for structs and messages,
-- integer-only filter variants for very small MCUs.
+- GPIO pin abstraction layer for portable digital I/O,
+- multi-channel ADC multiplexing helpers,
+- non-volatile storage wrappers for EEPROM / flash settings,
+- MODBUS or CANopen protocol helpers,
+- battery voltage monitoring with coulomb-counting estimates.
 
 ## Status
 
