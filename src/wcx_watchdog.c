@@ -50,7 +50,7 @@ bool wcx_watchdog_check(wcx_watchdog_t *wd, uint32_t now_ms)
     {
         return true;
     }
-    if (wcx_time_reached(wd->last_kick, wd->timeout_ms, now_ms))
+    if (wcx_time_reached(now_ms, wd->last_kick + wd->timeout_ms))
     {
         wd->expired = true;
         if (wd->on_expire != NULL)
